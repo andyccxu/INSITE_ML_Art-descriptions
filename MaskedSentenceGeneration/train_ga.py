@@ -1,3 +1,7 @@
+# Modified for training with gradient accumulation technique
+# Turns out to adversely affect the training results
+# But reduces the use of GPU memory
+
 import os
 import time
 import json
@@ -13,7 +17,7 @@ from models import Encoder, ParallelDecoder
 from datasets import CaptionDatasetPara
 from utils import adjust_learning_rate, AverageMeter, save_checkpoint, accuracy, clip_gradient
 from nltk.translate.bleu_score import corpus_bleu
-
+from torch.cuda.amp import GradScaler, autocast
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--exp_name', type=str, default='')
@@ -40,6 +44,8 @@ emb_dim = args.emb_dim           # dimension of word embeddings
 attention_dim = args.attention_dim     # dimension of attention linear layers
 decoder_dim = args.decoder_dim      # dimension of decoder RNN
 dropout = 0.5
+if not torch.cuda.is_available():
+    print("We are running on CPU!")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
@@ -59,6 +65,8 @@ fine_tune_encoder = args.fine_tune_encoder        # fine-tune encoder?
 checkpoint = None               # path to checkpoint, None if none
 num_topics = 3
 exp_name = args.exp_name
+
+gradient_accumulations = 4
 
 
 def main():
@@ -169,6 +177,8 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
     start = time.time()
 
+    scaler = GradScaler()
+
     # Batches
     for i, (imgs, caps, caplens, _) in enumerate(train_loader):
         data_time.update(time.time() - start)
@@ -183,6 +193,8 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         output_tuple = decoder(imgs, caps, caplens)
         loss = []
 
+        # check for empty tensor
+        tensor_empty = False
         for t in range(num_topics):
             scores, caps_sorted, decode_lengths, alphas, sort_ind = output_tuple[t]
 
@@ -197,29 +209,39 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
             scores = scores[:offset]
             targets = targets[:offset]
 
+            # check if tensor is empty
+            if offset == 0:
+                tensor_empty = True
+                break
+
             # Remove timesteps that we didn't decode at, or are pads
             scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
             targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
 
-            # Calculate loss
-            loss_t = criterion(scores, targets)
+            with autocast():
+                # Calculate loss
+                loss_t = criterion(scores, targets)
 
-            # Add attention regularization
-            loss_t += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
+                # Add attention regularization
+                loss_t += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
-            loss.append(loss_t)
+                loss.append(loss_t)
 
             # Keep track of metrics
             top5 = accuracy(scores, targets, 5)
             losses[t].update(loss_t.item(), sum(decode_lengths))
             top5accs[t].update(top5, sum(decode_lengths))
 
+        if tensor_empty:
+            print("Skipped batch i =", i, "because input tensor is empty.")
+            continue
+
         # Back prop for all topics together
         decoder_optimizer.zero_grad()
         if encoder_optimizer is not None:
             encoder_optimizer.zero_grad()
-        loss = sum(loss)
-        loss.backward()
+        loss = sum(loss) / gradient_accumulations
+        scaler.scale(loss).backward()
 
         # Clip gradients
         if grad_clip is not None:
@@ -228,9 +250,11 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                 clip_gradient(encoder_optimizer, grad_clip)
 
         # Update weights
-        decoder_optimizer.step()
-        if encoder_optimizer is not None:
-            encoder_optimizer.step()
+        if (i + 1) % gradient_accumulations == 0 or i == len(train_loader) - 1:
+            scaler.step(decoder_optimizer)
+            if encoder_optimizer is not None:
+                scaler.step(encoder_optimizer)
+            scaler.update()
 
         batch_time.update(time.time() - start)
         start = time.time()

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CUDA_VISIBLE_DEVICES=1 \
-python train.py \
+python3 train.py \
     --exp_name train_exp_01 \
     --data_folder dataset_semart \
     --batch_size 32 \

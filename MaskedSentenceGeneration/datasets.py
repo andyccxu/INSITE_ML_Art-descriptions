@@ -12,7 +12,7 @@ class CaptionDatasetPara(Dataset):
 
         # Open hdf5 file where images are stored
         self.h = h5py.File(os.path.join(data_folder, self.split + '_IMAGES_' + data_name + '.hdf5'), 'r')
-        self.imgs = self.h['images']
+        self.imgs = self.h['images_dataset']
 
         # Captions per image
         self.cpi = self.h.attrs['captions_per_image']

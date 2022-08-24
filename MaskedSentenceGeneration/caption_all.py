@@ -31,11 +31,11 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
     img = imresize(img, (256, 256))
     img = img.transpose(2, 0, 1)
     img = img / 255.
-    img = torch.FloatTensor(img).to(device)
+    img = torch.FloatTensor(img)
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     transform = transforms.Compose([normalize])
-    image = transform(img)      # (3, 256, 256)
+    image = transform(img).to(device)      # (3, 256, 256)
 
     # Encode
     image = image.unsqueeze(0)  # (1, 3, 256, 256)
@@ -94,7 +94,7 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
             next_word_inds = top_k_words % vocab_size  # (s)
 
             # Add new words to sequences
-            seqs = torch.cat([seqs[prev_word_inds], next_word_inds.unsqueeze(1)], dim=1)  # (s, step+1)
+            seqs = torch.cat([seqs[prev_word_inds.long()], next_word_inds.unsqueeze(1)], dim=1)  # (s, step+1)
 
             # Which sequences are incomplete (didn't reach <end>)?
             incomplete_inds = [ind for ind, next_word in enumerate(next_word_inds) if
@@ -111,9 +111,9 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
             if k == 0:
                 break
             seqs = seqs[incomplete_inds]
-            h = h[prev_word_inds[incomplete_inds]]
-            c = c[prev_word_inds[incomplete_inds]]
-            encoder_out = encoder_out[prev_word_inds[incomplete_inds]]
+            h = h[prev_word_inds[incomplete_inds].long()]
+            c = c[prev_word_inds[incomplete_inds].long()]
+            encoder_out = encoder_out[prev_word_inds[incomplete_inds].long()]
             top_k_scores = top_k_scores[incomplete_inds].unsqueeze(1)
             k_prev_words = next_word_inds[incomplete_inds].unsqueeze(1)
 

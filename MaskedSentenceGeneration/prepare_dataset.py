@@ -12,7 +12,8 @@ from stanfordcorenlp import StanfordCoreNLP
 from utils import sentence_normalize, un_capitalize, merge_entities, check_exact_author, list2long
 
 
-nlp = StanfordCoreNLP('/data00/user1/data/corenlp/')
+# nlp = StanfordCoreNLP('/data00/user1/data/corenlp/')
+nlp = StanfordCoreNLP('./corenlp/stanford-corenlp-4.4.0/')
 num_topics = 3
 
 
@@ -167,7 +168,7 @@ def create_dataset(image_folder, output_folder, max_len=100, min_len=5, min_word
 
         with h5py.File(os.path.join(output_folder, split + '_IMAGES_' + base_filename + '.hdf5'), 'a') as h:
             h.attrs['captions_per_image'] = 1
-            images = h.create_dataset('images', (len(impaths), 3, 256, 256), dtype='uint8')
+            images = h.create_dataset('images_dataset', (len(impaths), 3, 256, 256), dtype='uint8')
             print("\nReading %s images and captions, storing to file...\n" % split)
 
             enc_captions = [[] for _ in range(num_topics)]
