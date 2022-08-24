@@ -1,0 +1,44 @@
+Bootstrap: docker
+From: ubuntu:18.04
+
+# The container built using this definition file is for running masked sentence generation. 
+# The PyTorch version may be different from the one specified, but it does not matter.
+
+%post
+    # Downloads the latest package lists (important).
+    apt-get update -y
+    # Runs apt-get while ensuring that there are no user prompts that would
+    # cause the build process to hang.
+    # Install Java JDK, Python3 (the default version is 3.6), pip
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        default-jdk \
+        python3 \
+        python3-pip
+    # Reduce the size of the image by deleting the package lists we downloaded,
+    # which are useless now.
+    rm -rf /var/lib/apt/lists/*
+    
+    # Install basics like git
+    apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages \
+    --no-install-recommends \
+            git \
+            vim \
+            wget \
+            unzip 
+
+    # Required for installing the Python packages.
+    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade Pillow
+    pip3 install setuptools
+
+    # Install Python packages.
+    pip3 install h5py
+    pip3 install torch==1.1.0
+    pip3 install torchvision==0.2.2
+    pip3 install numpy==1.16.2
+    pip3 install visdom==0.1.8.9
+    pip3 install transformers==2.1.1
+    pip3 install nltk==3.2.3
+    pip3 install stanfordcorenlp==3.9.1.1
+    pip3 install scipy==1.1.0
+    pip3 install pandas==0.25.1

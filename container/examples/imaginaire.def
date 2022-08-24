@@ -1,0 +1,74 @@
+Bootstrap: docker 
+From: nvcr.io/nvidia/pytorch:20.03-py3
+
+# This definition file was provided by Randy to serve as an example. 
+
+%files
+# Install correlation.
+ /export/groups/singularity/defs/imaginaire/imaginaire/third_party/correlation correlation
+# Install channelnorm.
+ /export/groups/singularity/defs/imaginaire/imaginaire/third_party/channelnorm channelnorm
+# Install resample2d.
+ /export/groups/singularity/defs/imaginaire/imaginaire/third_party/resample2d resample2d
+
+%post
+    # Downloads the latest package lists (important).
+    #apt-get update -y
+    # Runs apt-get while ensuring that there are no user prompts that would
+    # cause the build process to hang.
+    # python3-tk is required by matplotlib.
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        less \
+        vim 
+    # Reduce the size of the image by deleting the package lists we downloaded,
+    # which are useless now.
+    #rm -rf /var/lib/apt/lists/*
+    # Install Python modules.
+
+# Install basics
+apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends
+ \
+        build-essential \
+        cmake \
+        git \
+        curl \
+        vim \
+        tmux \
+        wget \
+        bzip2 \
+        unzip \
+        g++ \
+        ca-certificates \
+        ffmpeg \
+        libx264-dev \
+        imagemagick
+
+#conda install https://repo.anaconda.com/pkgs/main/linux-64/python-3.8.12-h12debd9_0.tar.bz2
+#conda update python
+#conda install python=3.8
+#python -m pip install
+
+#conda install https://repo.anaconda.com/pkgs/main/linux-64/pip-20.2.2-py38h06a4308_0.tar.bz2
+
+ pip install scikit-image tqdm wget
+ pip install Pillow==6.1
+ pip install pyyaml
+ pip install cython  lmdb scipy tensorboard
+ pip install jupyterlab==2.2.10
+ pip install opencv-python opencv-contrib-python
+ pip install open3d==0.12.0
+ pip install albumentations requests
+ pip install imageio-ffmpeg
+ pip install av
+ pip install cmake
+ pip install pynvml
+ pip install nvidia-ml-py3==7.352.0
+ pip install face-alignment dlib
+ pip install dominate
+
+# Install correlation.
+ cd correlation && rm -rf build dist *-info && python setup.py install
+# Install channelnorm.
+ cd ../channelnorm && rm -rf build dist *-info && python setup.py install
+# Install resample2d.
+ cd ../resample2d && rm -rf build dist *.egg-info && python setup.py install

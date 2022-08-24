@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: nvidia/cuda:9.0-devel
+
+# The container built from this definition file works fine to compile the CUDA dependencies, 
+# i.e. run `sh make.sh` in the faster-rcnn/lib directory.
+# Built upon the cuda-9.0 base image, but still unable to run `prepare_visual_concept.py`. 
+# (Same error message as CUDA 11.4 was installed.)
+
+%post
+    # Downloads the latest package lists (important).
+    apt-get update -y
+    # Runs apt-get while ensuring that there are no user prompts that would
+    # cause the build process to hang.
+
+    # Install the basics
+    apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages \
+    --no-install-recommends \
+            git \
+            vim \
+            wget \
+            build-essential \
+            gnupg2 
+
+    # Reduce the size of the image by deleting the package lists we downloaded,
+    # which are useless now.
+    rm -rf /var/lib/apt/lists/*
+
+    # Installing Anaconda 3 
+    wget -c --no-check-certificate https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
+    bash Anaconda3-2020.02-Linux-x86_64.sh -bfp /usr/local
+    # Conda configuration of channels from .condarc file
+    conda config --file /.condarc --add channels defaults
+    conda config --file /.condarc --add channels conda-forge
+    conda update conda
+
+    rm Anaconda3-2020.02-Linux-x86_64.sh
+
+    # build a new python2.7 env with a set of specified packages
+    conda create -n py27 python=2.7 \
+    tqdm h5py nltk pexpect==4.2.1 \
+    pandas gensim cython scipy scikit-learn opencv
+
+    # install pytorch 0.4.0 with CUDA 9.0
+    conda install pytorch==0.4.0 torchvision -c pytorch -n py27
+    # conda install -c nvidia/label/cuda-11.4.4 cuda-nvcc cudatoolkit -n py27
+    # conda install -c conda-forge cudatoolkit-dev -n py27
+
+    # context-art-classification
+    conda install -c conda-forge visdom -n py27
+
+    # faster rcnn
+    conda install -c conda-forge msgpack-python -n py27
+    conda install -c conda-forge easydict -n py27
+    conda install -c conda-forge matplotlib -n py27
+    conda install -c conda-forge pyyaml -n py27
+    conda install -c conda-forge tensorboardx -n py27
+
+    # drqa
+    conda install -c conda-forge termcolor -n py27
+    conda install -c conda-forge regex -n py27
+    conda install -c conda-forge prettytable -n py27
+    conda install -c conda-forge elasticsearch -n py27
